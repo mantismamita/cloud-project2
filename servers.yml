@@ -33,7 +33,7 @@ Resources:
                   CidrIpv6: ::/0
             VpcId:
                 Fn::ImportValue:
-                  !Sub "${EnvironmentName}-VPCID"
+                  !Sub ${EnvironmentName}-VPCID
 
     WebServerSecGroup:
         Type: AWS::EC2::SecurityGroup
@@ -42,7 +42,7 @@ Resources:
             GroupDescription: Allow http from local VPC
             VpcId: 
                 Fn::ImportValue:
-                  !Sub "${EnvironmentName}-VPCID"
+                  !Sub ${EnvironmentName}-VPCID
             SecurityGroupIngress: 
                 - CidrIp: 0.0.0.0/0
                   FromPort: 80
@@ -71,7 +71,7 @@ Resources:
                 Action:
                   - 'sts:AssumeRole' 
           Policies:
-            - PolicyName: AmazonS3ReadOnlyAccess
+            - PolicyName: S3ReadOnlyAccess
               PolicyDocument:
                 Version: '2012-10-17'
                 Statement:
@@ -96,8 +96,8 @@ Resources:
                     !Sub "${EnvironmentName}-PRIV-NETS"
             LaunchConfigurationName: 
                 Ref: WebAppLaunchConfig
-            MaxSize: '3'
-            MinSize: '1'
+            MaxSize: '4'
+            MinSize: '2'
             TargetGroupARNs:
               - Ref: WebAppTargetGroup
 
@@ -107,17 +107,14 @@ Resources:
             UserData:
                 Fn::Base64: !Sub |
                   #!/bin/bash
-                  exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-                  sudo apt-get update -y
-                  sudo apt-get install unzip awscli -y
-                  sudo apt-get install apache2 -y
+                  apt-get update -y
+                  apt-get install unzip awscli -y
+                  apt-get install apache2 -y
                   systemctl start apache2.service
                   cd /var/www/html
-                  sudo aws s3 cp s3://udacity-demo-1/udacity.zip .
-                  sudo unzip -o udacity.zip
-                  systemctl restart apache2.service
+                  aws s3 cp s3://udacity-demo-1/udacity.zip .
+                  unzip -o udacity.zip
             ImageId: ami-0d1cd67c26f5fca19
-            KeyName: udacity-cloud2
             IamInstanceProfile: !Ref ProfileWithRolesForOurApp
             SecurityGroups:
                 - Ref: WebServerSecGroup
@@ -135,6 +132,9 @@ Resources:
         - Fn::ImportValue: !Sub "${EnvironmentName}-PUB2-SN"
         SecurityGroups:
         - Ref: LBSecGroup
+        Tags:
+        - Key: Name
+          Value: Web App Load Balancer
 
     Listener:
       Type: AWS::ElasticLoadBalancingV2::Listener
@@ -168,7 +168,7 @@ Resources:
             HealthCheckProtocol: HTTP
             HealthCheckTimeoutSeconds: 10
             HealthyThresholdCount: 2
-            Port: 8080
+            Port: 80
             Protocol: HTTP
             UnhealthyThresholdCount: 5
             VpcId:
@@ -179,25 +179,3 @@ Outputs:
   PublicUrl:
     Description: Public facing url for web app
     Value: !Join  ['', ['http://', !GetAtt [WebAppLB, DNSName]]]
-  #LoadBalancer
-
-  #LaunchConfiguration
-
-      #AutoScalingGroup
-  #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
-  # ProfileWithRolesForOurApp:
-  #   Type: AWS::IAM::InstanceProfile
-  #   Properties: 
-  #     Roles:
-  #       - UdacityS3ReadOnlyEC2
-  
-  #         #!/bin/bash
-  #         apt-get update -y
-  #         apt-get install unzip awscli -y
-  #         apt-get install apache2 -y
-  #         systemctl start apache2.service
-  #         cd /var/www/html
-  #         aws s3 cp s3://udacity-demo-1/udacity.zip .
-  #         unzip -o udacity.zip
-  # Outputs: 
-  #Bonus points for useful outputs!
